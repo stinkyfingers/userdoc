@@ -18,12 +18,14 @@ type visitor struct {
 }
 
 type userdoc struct {
-	selector string   `markdownTable:"selector"`
-	Params   []string `markdownTable:"params"`
-	Comments []string `markdownTable:"comments"`
+	selector   string   `markdownTable:"selector"`
+	Params     []string `markdownTable:"params"`
+	Comments   []string `markdownTable:"comments"`
+	lineNumber string
 }
 
 var stdOutFunctions = []string{
+	"errors.New",
 	"os.Stdout.Write",
 	"fmt.Printf",
 	"fmt.Println",
@@ -58,16 +60,11 @@ func (v *visitor) Visit(n ast.Node) ast.Visitor {
 	}
 
 	switch d := n.(type) {
-
-	// TODO - remove Ident?
 	case *ast.ReturnStmt:
 		for _, res := range d.Results {
 			switch e := res.(type) {
 			case *ast.CallExpr:
 				v.getCallExprArgsAndComments(e, &n)
-				// case *ast.Ident:
-				// 	log.Print("E", e)
-				// v.getIdentExprArgsAndComments(e, &n)
 			}
 		}
 
@@ -77,6 +74,19 @@ func (v *visitor) Visit(n ast.Node) ast.Visitor {
 			v.getCallExprArgsAndComments(e, &n)
 		}
 
+		// catch general declarations, e.g. ErrTodo = errors.New()
+	case *ast.GenDecl:
+		for _, spec := range d.Specs {
+			if value, ok := spec.(*ast.ValueSpec); ok {
+				for _, vv := range value.Values {
+					if call, ok := vv.(*ast.CallExpr); ok {
+						v.getCallExprArgsAndComments(call, &n)
+					}
+				}
+			}
+		}
+		// case *ast.CallExpr:
+		// 	v.getCallExprArgsAndComments(d, &n)
 	}
 	return v
 }
@@ -117,6 +127,7 @@ func (v *visitor) recursivelyGetCallExprArgsAndComments(call *ast.CallExpr, n *a
 	}
 	if appendUserDoc {
 		v.getComments(u, n)
+		u.lineNumber = v.fset.Position(call.Pos()).String()
 		v.userdocs = append(v.userdocs, *u)
 	}
 }
@@ -124,7 +135,9 @@ func (v *visitor) recursivelyGetCallExprArgsAndComments(call *ast.CallExpr, n *a
 // getComments add a node's comments to the userdoc
 func (v *visitor) getComments(u *userdoc, n *ast.Node) {
 	if commentGroups, ok := v.commentMap[*n]; ok && len(commentGroups) > 0 {
-		u.Comments = append(u.Comments, strings.Replace(commentGroups[0].Text(), "\n", "", -1)) // NOTE - inline comments only; first comment
+		for _, comment := range commentGroups {
+			u.Comments = append(u.Comments, strings.Replace(comment.Text(), "\n", "", -1)) // NOTE - inline comments only; first comment
+		}
 	}
 }
 

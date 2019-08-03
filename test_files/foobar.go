@@ -9,7 +9,11 @@ import (
 )
 
 // ErrNum is a test err
-var ErrNum = errors.New("this is a num err")
+var ErrNum = errors.New("this is a num err") // other comments - ignore???
+
+type Struct struct {
+	i int
+}
 
 // Foo is a test function
 func Foo(name string) (int, error) {
@@ -25,6 +29,7 @@ func bar(number int) error {
 	}
 	Foo("fooing here") // this foos
 	return funk.Funk() // this is a FUNK comment
+
 	// Foo("hey")  // we are fooing and heying
 	// return nil
 }
